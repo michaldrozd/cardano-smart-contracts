@@ -1,0 +1,63 @@
+-- Copyright (C) 2021 Michal Drozd
+-- All Rights Reserved
+
+-- AuctionContract.plutus
+
+import qualified Language.PlutusTx            as PlutusTx
+import           Ledger
+import           Ledger.Ada
+import           Ledger.Constraints          (TxConstraints)
+import           Ledger.Validation            (ValidationError)
+import qualified Playground.Contract          as Playground
+import           Wallet.Emulator              (WalletStyle)
+import qualified Wallet.Emulator              as Emulator
+
+
+-- | The data type of this contract's state, which is just a single 'Integer' representing the current bid amount.
+data AuctionState = AuctionState { currentBid :: Integer } deriving stock (Show, Eq, Generic) deriving anyclass (ToJSON, FromJSON)
+
+
+-- | The initial value for the contract's state.
+initialAuctionState :: AuctionState
+initialAuctionState = AuctionState 0
+
+
+-- | The type of this contract's validation error, which is 'Void' because this contract has no validation logic.
+type AuctionError = Void
+
+
+-- | The type of this contract's endpoint, which is 'Integer' because the only endpoint just returns the current bid amount.
+type AuctionEndpoint = Integer
+
+
+-- | The implementation of this contract's Plutus code. It has two entry points: 'placeBid' and 'endAuction'.
+auctionContract :: Contract AuctionState () AuctionError () Integer ()
+auctionContract = Contract { initHandler        = \() _ -> pure initialAuctionState
+                           , exitHandler        = \_  _ -> pure ()
+                           , actionHandlers     = Map.fromList [ ("placeBid", placeBid) ] -- TODO: add endAuction handler here!
+                           , queryHandlers      = Map.fromList [ ("currentBid", currentBid) ] -- TODO: add endAuction handler here!
+                           }
+
+
+-- | The implementation of the 'placeBid' endpoint. It takes a 'Integer' representing the new bid amount, and if it's higher than the current bid, it updates the contract's state.
+placeBid :: () -> Integer -> ContractConstraints AuctionState () AuctionError () Integer ()
+placeBid _ newBid = do
+    oldState <- getState <$> getContext
+    let oldBid = currentBid oldState
+    if newBid > oldBid then putState $ AuctionState newBid else pure ()
+
+
+-- | The implementation of the 'currentBid' endpoint. It just returns the current bid amount from the contract's state.
+currentBid :: () -> ContractConstraints AuctionState () AuctionError () Integer ()
+currentBid _ = do
+    state <- getState <$> getContext
+    pure $ currentBid state
+
+
+-- | The implementation of the 'endAuction' endpoint. It takes no arguments and returns no value, but it does transfer the current bid amount to the contract's owner.
+endAuction :: () -> ContractConstraints AuctionState () AuctionError () Integer ()
+endAuction _ = do
+    state <- getState <$> getContext
+    let bid = currentBid state
+    owner <- getOwner <$> getContext
+    payToScript_ owner (fromIntegral bid)

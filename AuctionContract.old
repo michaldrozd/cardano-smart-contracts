@@ -1,0 +1,44 @@
+-- Copyright (C) 2021 Michal Drozd
+-- All Rights Reserved
+
+module Main where
+
+import Language.PlutusTx
+import Language.PlutusTx.Prelude
+import Language.PlutusTx.Builtins
+
+data Auction = Auction {
+    itemName :: String,
+    itemDescription :: String,
+    startPrice :: Integer,
+    highestBid :: Integer,
+    highestBidder :: Address
+}
+
+placeBid : Auction -> Integer -> (Boolean, Auction)
+placeBid auction bid =
+    if bid > highestBid auction then
+        (True, auction { highestBid = bid, highestBidder = txSender })
+    else
+        (False, auction)
+
+endAuction : Auction -> (Boolean, String)
+endAuction auction =
+    if txSender == highestBidder auction then
+        (True, "Auction sold to " ++ show (highestBidder auction) ++ " for " ++ show (highestBid auction))
+    else
+        (False, "Auction not ended")
+
+main : () -> ()
+main _ =
+    let
+        auction = Auction {
+            itemName = "My Item",
+            itemDescription = "This is a very nice item",
+            startPrice = 100,
+            highestBid = 0,
+            highestBidder = Address "0x0"
+        }
+    in
+    trace auction
+    trace $ placeBid auction 150

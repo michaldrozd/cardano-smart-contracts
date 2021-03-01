@@ -1,0 +1,44 @@
+-- Copyright (C) 2021 Michal Drozd
+-- All Rights Reserved
+
+module Main where
+
+import Language.PlutusTx
+import Language.PlutusTx.Prelude
+import Language.PlutusTx.Builtins
+
+data Campaign = Campaign {
+    campaignName :: String,
+    campaignDescription :: String,
+    targetFunding :: Integer,
+    currentFunding :: Integer,
+    deadline :: Integer
+}
+
+contribute : Campaign -> Integer -> (Boolean, Campaign)
+contribute campaign amount =
+    if (txTimestamp <= deadline campaign) && (currentFunding campaign + amount <= targetFunding campaign) then
+        (True, campaign { currentFunding = currentFunding campaign + amount })
+    else
+        (False, campaign)
+
+refund : Campaign -> Address -> (Boolean, Integer)
+refund campaign contributor =
+    if (txSender == contributor) && (currentFunding campaign < targetFunding campaign) then
+        (True, currentFunding campaign)
+    else
+        (False, 0)
+
+main : () -> ()
+main _ =
+    let
+        campaign = Campaign {
+            campaignName = "My Campaign",
+            campaignDescription = "This is a very nice campaign",
+            targetFunding = 1000,
+            currentFunding = 0,
+            deadline = 10000000000
+        }
+    in
+    trace campaign
+    trace $ contribute campaign 500

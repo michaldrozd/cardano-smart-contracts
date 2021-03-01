@@ -1,0 +1,57 @@
+-- Copyright (C) 2021 Michal Drozd
+-- All Rights Reserved
+
+module Main where
+
+import Language.PlutusTx
+import Language.PlutusTx.Prelude
+import Language.PlutusTx.Builtins
+
+data Escrow = Escrow {
+    buyer :: Address,
+    seller :: Address,
+    arbitrator :: Address,
+    item :: String,
+    amount :: Integer,
+    status :: String
+}
+
+create : Address -> Address -> Address -> String -> Integer -> Escrow
+create buyer seller arbitrator item amount =
+    Escrow {
+        buyer = buyer,
+        seller = seller,
+        arbitrator = arbitrator,
+        item = item,
+        amount = amount,
+        status = "created"
+    }
+
+release : Escrow -> (Boolean, Escrow)
+release escrow =
+    if (txSender == buyer escrow) && (status escrow == "created") then
+        (True, escrow { status = "released" })
+    else
+        (False, escrow)
+
+refund : Escrow -> (Boolean, Escrow)
+refund escrow =
+    if (txSender == seller escrow) && (status escrow == "created") then
+        (True, escrow { status = "refunded" })
+    else
+        (False, escrow)
+
+arbitrate : Escrow -> (Boolean, Escrow)
+arbitrate escrow =
+    if (txSender == arbitrator escrow) && (status escrow == "created") then
+        (True, escrow { status = "arbitrated" })
+    else
+        (False, escrow)
+
+main : () -> ()
+main _ =
+    let
+        escrow = create (Address "0x1") (Address "0x2") (Address "0x3") "My Item" 500
+    in
+    trace escrow
+    trace $ release escrow
